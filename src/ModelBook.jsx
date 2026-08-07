@@ -42,11 +42,25 @@ const mbISO = (d) => {
   return "";
 };
 
-// ── Card date range → "Feb 18 → Apr 30, 2025" (ISO in; tolerant of null / one-sided ranges)
+// ── Card date range → "Feb 18th → Apr 30th, 2025" (ISO in; tolerant of null / one-sided ranges)
+// keep in sync with fmtNice in App.jsx
+const MB_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const mbFmtDay = (iso) => {
   if (!iso) return "";
   const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
-  return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (isNaN(d)) return "";
+  const day = d.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${MB_MONTHS[d.getMonth()]} ${day}${suffix}`;
+};
+// Full single-date form → "Aug 7th, 2026". For standalone (non-range) date renders.
+const mbFmtNice = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  if (isNaN(d)) return "—";
+  const day = d.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${MB_MONTHS[d.getMonth()]} ${day}${suffix}, ${d.getFullYear()}`;
 };
 const mbDateRange = (entry, exit) => {
   const e = mbFmtDay(entry), x = mbFmtDay(exit);
@@ -696,12 +710,12 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodes
   // renders the SAME chronological timeline via buildChartList, ONE CHART PER PAGE (nothing can
   // crop), big header on page 1, slim running header on later pages, scorecard page last.
   const addedStamp = (r) => { const d = r.created_at ? new Date(r.created_at) : null;
-    return d && !isNaN(d) ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""; };
+    return d && !isNaN(d) ? mbFmtNice(d.toISOString().slice(0, 10)) : ""; };
   const bigHead = (r, m) => `<div class="ehead">
       <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(m.setup)}</span></div>
-      <div class="emeta">${esc(m.date)}${r.exit_date && !r.metrics?.study ? " → " + esc(r.exit_date) : ""} · <b class="${m.good ? "good" : m.bad ? "bad" : ""}">${esc(m.outcome)}</b> · ${esc(m.score)} · ${"★".repeat(m.stars)}${"☆".repeat(Math.max(0, 5 - m.stars))}${addedStamp(r) ? `<span class="added">added ${esc(addedStamp(r))}</span>` : ""}</div>
+      <div class="emeta">${esc(mbFmtDay(m.date) || m.date)}${r.exit_date && !r.metrics?.study ? " → " + esc(mbFmtDay(r.exit_date) || r.exit_date) : ""} · <b class="${m.good ? "good" : m.bad ? "bad" : ""}">${esc(m.outcome)}</b> · ${esc(m.score)} · ${"★".repeat(m.stars)}${"☆".repeat(Math.max(0, 5 - m.stars))}${addedStamp(r) ? `<span class="added">added ${esc(addedStamp(r))}</span>` : ""}</div>
     </div>`;
-  const slimHead = (r, m, label) => `<div class="shead"><span class="stk">${esc(r.ticker)}</span><span class="slab">${esc(label)}</span><span class="smeta">${esc(m.date)}</span></div>`;
+  const slimHead = (r, m, label) => `<div class="shead"><span class="stk">${esc(r.ticker)}</span><span class="slab">${esc(label)}</span><span class="smeta">${esc(mbFmtDay(m.date) || m.date)}</span></div>`;
   const entry = (r, idx) => {
     const isS = !!r.metrics?.study;
     const m = rowMeta(r, idx);
@@ -759,7 +773,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodes
     const anchorSpans = legs.slice(1).map((l) => `<span id="e${l.idx}"></span>`).join(""); // other legs' menu targets
     const campHead = `<div class="ehead">
       <div><span class="tk">${esc(root.ticker)}</span><span class="pat">${esc(setupLabel)}</span></div>
-      <div class="emeta"><b>${legs.length} legs</b> · ${esc(first)} → ${esc(last)}${addedStamp(root) ? `<span class="added">added ${esc(addedStamp(root))}</span>` : ""}</div>
+      <div class="emeta"><b>${legs.length} legs</b> · ${esc(mbFmtDay(first) || first)} → ${esc(mbFmtDay(last) || last)}${addedStamp(root) ? `<span class="added">added ${esc(addedStamp(root))}</span>` : ""}</div>
     </div>`;
     // Chart pages ONCE — the union of the campaign's chart-bearing rows (in practice the root's set).
     const chartLegs = legs.filter((l) => buildChartList(l.r, true).some((c) => c && c.img));
@@ -784,7 +798,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodes
         const isLtf = c.role === "before"; // study mapping: after_img (LTF daily) → role "before"
         const cap = isLtf ? "LTF — daily setup" : figLabel(c, 0);
         return `<section class="entry chartpg">
-        <div class="shead"><span class="stk">${esc(l.r.ticker)} · leg ${n}</span><span class="slab">${esc(cap)}</span><span class="smeta">${esc(legDate)}</span></div>
+        <div class="shead"><span class="stk">${esc(l.r.ticker)} · leg ${n}</span><span class="slab">${esc(cap)}</span><span class="smeta">${esc(mbFmtDay(legDate) || legDate)}</span></div>
         <figure class="fullfig"><figcaption>${esc(cap)}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
       </section>`;
       }).join("");
@@ -1217,7 +1231,7 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
           stat(study.direction === "short" ? "Fall after the break" : "Peak gain", pkv),
           stat("After 20 days", m.t20 != null ? sgn(m.t20) : null),
         ].filter(Boolean).join(`<span class="pcDot" style="margin:0 14px">·</span>`);
-        const headline = r.thesis || `${study.setup}${study.direction === "short" ? ", short side" : ""} — ${esc(r.entry_date || "")}`;
+        const headline = r.thesis || `${study.setup}${study.direction === "short" ? ", short side" : ""} — ${esc(r.entry_date ? mbFmtNice(r.entry_date) : "")}`;
         // Hero = the DAILY chart, whichever slot holds it (his setup slot is sometimes the 5-minute
         // entry chart; the daily then lives in the context slot). Everything else goes to the expander.
         const slots = [
@@ -1235,7 +1249,7 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
           : "Context";
         const subOf = (x) => {
           const w = TFWORD[x.tf] || "daily";
-          if (x === heroSlot) return `${esc(r.ticker)} ${w} · the trigger day is ${esc(r.entry_date || "the last candle")}`;
+          if (x === heroSlot) return `${esc(r.ticker)} ${w} · the trigger day is ${esc(r.entry_date ? mbFmtNice(r.entry_date) : "the last candle")}`;
           if (x.role === "outcome") return `${esc(r.ticker)} ${w} · the same story, weeks later`;
           if (INTRA.includes(x.tf)) return `${esc(r.ticker)} ${w} · the entry, candle by candle`;
           return `${esc(r.ticker)} ${w} · the bigger picture going into the trade`;
@@ -1247,7 +1261,7 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
           <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
             <div>
               <div class="pcK" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Study ${String(idx + 1).padStart(2, "0")} of ${String(rows.length).padStart(2, "0")}</div>
-              <div class="pcH" style="font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
+              <div class="pcH" style="font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px">${esc(r.entry_date ? mbFmtNice(r.entry_date) : "")}</div>
               <div class="pcM" style="font-size:0.82rem;margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " · short side" : ""}</div>
             </div>
             <div style="min-width:0">
@@ -1274,8 +1288,8 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
       const vsPhrase = (vsN !== "" && vsN != null && !Number.isNaN(+vsN))
         ? (+vsN < 0 ? ` — bottomed ${Math.abs(+vsN)} session${Math.abs(+vsN) === 1 ? "" : "s"} before the index`
           : +vsN > 0 ? ` — bottomed ${+vsN} session${+vsN === 1 ? "" : "s"} after the index` : ` — bottomed with the index`) : "";
-      const capA = isMB ? `${esc(r.ticker)} vs QQQ, daily. Own low ${esc(r.entry_date || "—")}${vsPhrase}.`
-        : `${esc(r.ticker)}, daily — the setup into the ${esc(r.entry_date || "trigger")} trigger.`;
+      const capA = isMB ? `${esc(r.ticker)} vs QQQ, daily. Own low ${esc(r.entry_date ? mbFmtNice(r.entry_date) : "—")}${vsPhrase}.`
+        : `${esc(r.ticker)}, daily — the setup into the ${esc(r.entry_date ? mbFmtNice(r.entry_date) : "trigger")} trigger.`;
       const capB = isMB ? `${esc(r.ticker)}, daily${(m.ret_3m !== "" && m.ret_3m != null)
         ? ` — ${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% in the three months off the low` : ""}.`
         : `${esc(r.ticker)}, daily — ${m.day_pct != null ? `${+m.day_pct >= 0 ? "+" : ""}${esc(m.day_pct)}% day one` : "the outcome"}${m.peak_pct != null ? `, ${+m.peak_pct >= 0 ? "+" : ""}${esc(m.peak_pct)}% to the peak in ${esc(m.sessions_to_peak)} sessions` : ""}.`;
@@ -1288,13 +1302,13 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
       const cells = isMB ? [
-        ["Own low", esc(r.entry_date || "") || "—"],
+        ["Own low", esc(r.entry_date ? mbFmtNice(r.entry_date) : "") || "—"],
         ["Vs index", fmtSess(m.sessions_vs_index)],
         ["+3M", fmtPct(m.ret_3m)],
         ["+6M", fmtPct(m.ret_6m)],
         ["Vs QQQ 3M", fmtPp(m.vs_qqq_3m)],
       ] : [
-        ["Trigger", esc(r.entry_date || "") || "—"],
+        ["Trigger", esc(r.entry_date ? mbFmtNice(r.entry_date) : "") || "—"],
         ...(m.gap_pct != null ? [["Gap", fmtPct(m.gap_pct)]] : []),
         ...(m.day_pct != null ? [["Day-1", fmtPct(m.day_pct)]] : []),
         ...(m.rvol_eod != null ? [["RVOL", `${esc(m.rvol_eod)}×`]] : []),
@@ -1302,7 +1316,7 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
         ...(m.peak_pct != null ? [["Peak", `${fmtPct(m.peak_pct)} · ${esc(m.sessions_to_peak ?? "—")}s`]] : []),
       ];
       if (m.days_to_reclaim !== "" && m.days_to_reclaim != null) cells.push(["Reclaim", `${esc(m.days_to_reclaim)} sessions`]);
-      if (m.trigger_date) cells.push(["Trigger", esc(m.trigger_date)]);
+      if (m.trigger_date) cells.push(["Trigger", esc(mbFmtNice(m.trigger_date))]);
       const strip = `<div class="pbstrip">${cells.map(([k, v]) => `<div class="pbcell"><div class="pbck">${esc(k)}</div><div class="pbcv">${v}</div></div>`).join("")}</div>`;
       const ticks = def.buckets.flatMap((b) => b.items.map(([k, label]) => study.checks?.[k] ? `<span class="pbtick"><span class="pbtkg">✓</span>${esc(label)}</span>` : "").filter(Boolean));
       const checklist = `<div class="pbchecklist">${ticks.length ? ticks.join("") : `<span class="pbnotick">no criteria ticked yet</span>`}</div>`;
@@ -4472,7 +4486,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <button onClick={() => setDetail(null)} style={{ background: "var(--w06)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, borderRadius: 99, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">&times;</button>
               </div>
               <div style={{ fontSize: "0.75rem", color: C.muted, marginBottom: 16 }}>
-                {r.entry_date || "—"} → {r.exit_date || "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}
+                {r.entry_date ? mbFmtDay(r.entry_date) : "—"} → {r.exit_date ? mbFmtDay(r.exit_date) : "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}
               </div>
 
               {(() => {

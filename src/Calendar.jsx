@@ -203,7 +203,10 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
       {selDay && daily[selDay] && (() => {
         const info = daily[selDay];
         const dt = new Date(selDay + "T00:00:00Z");
-        const nice = `${DOW[dt.getUTCDay()]}, ${dt.getUTCDate()} ${MONTHS[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+        // keep in sync with fmtNice in App.jsx
+        const dayNum = dt.getUTCDate();
+        const ord = (dayNum % 10 === 1 && dayNum !== 11) ? "st" : (dayNum % 10 === 2 && dayNum !== 12) ? "nd" : (dayNum % 10 === 3 && dayNum !== 13) ? "rd" : "th";
+        const nice = `${MONTHS_SHORT[dt.getUTCMonth()]} ${dayNum}${ord}, ${dt.getUTCFullYear()} (${DOW[dt.getUTCDay()]})`;
         const plOf = (t) => t.plDollar == null ? Number(t.pl_dollar) : Number(t.plDollar);
         return (
           <div style={{ marginTop: 12, background: "var(--w02)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>

@@ -106,6 +106,34 @@ export default async function handler(req, res) {
       return Math.abs(aN - bN) <= Math.max(1, Math.max(aN, bN) * 0.05);
     };
     const toRefresh = rows.filter(r => seen.has(r.ib_exec_id) && sharesMatch(seen.get(r.ib_exec_id).shares, r.shares));
+    // ── EXPLICIT CAMPAIGN LINK (2026-08-08, the dead-campaign-bleed fix at the source) ──
+    // A partial sell of an ongoing campaign lands here while its open position row already
+    // exists. Stamp position_id at insert so the client's Realized bar uses the deterministic
+    // id path instead of the ticker/date heuristic. Rule: exactly ONE open lot of the ticker,
+    // and the fill EXITED AFTER that lot opened (date, then time on the same-day boundary) —
+    // the cycle invariant: you are flat before a re-entry, so a previous cycle's exit can
+    // never postdate the current lot's open. Ambiguous or missing data → leave null (the
+    // client heuristic still applies its own guards).
+    if (toInsert.length) {
+      const tickers = [...new Set(toInsert.map(r => r.ticker).filter(Boolean))];
+      const { data: linkPos } = await sb.from("positions")
+        .select("id, symbol, entry_date, entry_time")
+        .eq("user_id", user_id).eq("is_closed", false).in("symbol", tickers);
+      const byTicker = {};
+      for (const p of linkPos || []) (byTicker[p.symbol] = byTicker[p.symbol] || []).push(p);
+      const toMin = (s) => { const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+      for (const r of toInsert) {
+        const lots = byTicker[r.ticker] || [];
+        if (lots.length !== 1 || !r.exit_date || !lots[0].entry_date) continue;
+        const p = lots[0];
+        if (r.exit_date < p.entry_date) continue;
+        if (r.exit_date === p.entry_date) {
+          const pe = toMin(p.entry_time), tx = toMin(r.exit_time);
+          if (pe == null || tx == null || tx <= pe) continue;
+        }
+        r.position_id = p.id;
+      }
+    }
     if (toInsert.length) {
       const { data: ins, error: insErr } = await sb.from("trades").insert(toInsert).select("id");
       // 23505 = a concurrent run inserted it first; the index did its job, so tolerate it.

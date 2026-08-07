@@ -13,6 +13,17 @@ import TradeReplayChart from "./TradeReplayChart.jsx";
 
 const fmt$ = (v) => (v < 0 ? "-" : "+") + "$" + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+
 function aggStats(trades) {
   const closed = trades.filter(t => t.exit_date);
   const n = closed.length;
@@ -157,7 +168,7 @@ export default function MentorModePage({ C, font, session }) {
                       return (
                         <tr key={t.id} onClick={() => setSelTrade(on ? null : t)} style={{ cursor: "pointer", background: on ? "var(--w06)" : "transparent" }}>
                           <td style={{ padding: "9px 13px", fontWeight: 600, color: C.white, borderBottom: "1px solid var(--w06)" }}>{t.ticker}</td>
-                          <td style={{ padding: "9px 13px", color: C.muted, borderBottom: "1px solid var(--w06)" }}>{t.exit_date || "open"}</td>
+                          <td style={{ padding: "9px 13px", color: C.muted, borderBottom: "1px solid var(--w06)" }}>{t.exit_date ? fmtNice(t.exit_date) : "open"}</td>
                           <td style={{ padding: "9px 13px", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", fontVariantNumeric: "tabular-nums", color: (Number(t.pl_dollar) || 0) >= 0 ? C.green : C.red, borderBottom: "1px solid var(--w06)" }}>{t.pl_dollar != null ? fmt$(Number(t.pl_dollar)) : "—"}</td>
                           <td style={{ padding: "9px 13px", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", fontVariantNumeric: "tabular-nums", color: (Number(t.pl_pct) || 0) >= 0 ? C.green : C.red, borderBottom: "1px solid var(--w06)" }}>{t.pl_pct != null ? Number(t.pl_pct).toFixed(1) + "%" : "—"}</td>
                           <td style={{ padding: "9px 13px", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", fontVariantNumeric: "tabular-nums", color: C.muted, borderBottom: "1px solid var(--w06)" }}>{t.r_mult != null ? Number(t.r_mult).toFixed(2) + "R" : "—"}</td>
@@ -173,7 +184,7 @@ export default function MentorModePage({ C, font, session }) {
               {/* replay + annotate the selected trade */}
               {selTrade && selTrade.exit_date && (
                 <div style={{ ...card, marginBottom: 16 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", marginBottom: 8 }}>Replay — {selTrade.ticker} · {selTrade.exit_date} <span style={{ color: C.muted }}>· your note below attaches to THIS trade</span></div>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", marginBottom: 8 }}>Replay — {selTrade.ticker} · {fmtNice(selTrade.exit_date)} <span style={{ color: C.muted }}>· your note below attaches to THIS trade</span></div>
                   <TradeReplayChart trade={replayShape(selTrade)} C={C} font={font} />
                 </div>
               )}

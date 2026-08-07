@@ -20,11 +20,16 @@ const Stars = ({ C, n, size = "1.05rem" }) => (
   </span>
 );
 
+// "Aug 7th, 2026 (Fri)" — keep in sync with fmtNice in App.jsx (day+weekday, house style).
+const DL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DL_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function dateLabel(iso) {
   if (!iso) return "Undated";
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d)) return String(iso); // new Date() doesn't throw — it yields Invalid Date
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+  const day = d.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${DL_MONTHS[d.getMonth()]} ${day}${suffix}, ${d.getFullYear()} (${DL_DAYS[d.getDay()]})`;
 }
 
 const todayISO = () => {

@@ -1503,7 +1503,8 @@ const WHATS_NEW = [
     items: [
       "When part of a position has been sold, its Live Trades row now shows the same fill-up bar as the dashboard — how much of the original position was sold and the R banked. A slim version sits right in the list, no tap needed.",
       "The two stop rows are now one line that tells the story: the original stop struck through, an arrow, and where protection sits now — breakeven, trailed, or profit locked, colored by status.",
-      "Fixed: re-enter a stock the same day you exited it and the old trade's result no longer leaks into the new position's Realized bar — each round trip stands alone.",
+      "Fixed: re-enter a stock the same day you exited it and the old trade's result no longer leaks into the new position's Realized bar — each round trip stands alone, down to the minute. New synced trades also carry an explicit link to their campaign, so this stays airtight going forward.",
+      "All dates across the app now read the same way — Aug 7th, 2026 — in the trades list, Live Trades, calendars, and every 'as of' stamp.",
       "The Theme tag on Open Positions moved to the last column, so the numbers you check most — size, stop, risk, P/L — read straight across.",
     ],
   },
@@ -2206,7 +2207,7 @@ function WhatsNew() {
                 <div key={gi} style={{ paddingTop: gi ? 20 : 0, marginTop: gi ? 20 : 0, borderTop: gi ? `1px solid ${C.border}` : "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                     <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.text, background: "var(--w06)", border: "1px solid var(--w14)", borderRadius: 980, padding: "2px 9px" }}>{g.tag}</span>
-                    <span style={{ fontSize: "0.6875rem", color: C.muted, fontWeight: 600 }}>🆕 {g.date}</span>
+                    <span style={{ fontSize: "0.6875rem", color: C.muted, fontWeight: 600 }}>🆕 {fmtNice(g.date)}</span>
                   </div>
                   {g.entries.map((e, ei) => (
                     <div key={ei} style={{ paddingTop: ei ? 14 : 0, marginTop: ei ? 14 : 0, borderTop: ei ? `1px solid var(--w06)` : "none" }}>
@@ -2582,6 +2583,21 @@ const tradeDateISO = (d) => {
   if (m) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`; }
   return s;
 };
+
+// Display-only date format: "2026-08-07" (or any parsable date string, incl. legacy M/D/YY) → "Aug 7th, 2026".
+// Never use for sorting/comparison/storage — those stay on the raw ISO value.
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const iso = tradeDateISO(d);
+  let dt;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) dt = new Date(iso + "T00:00:00");
+  else dt = new Date(d instanceof Date ? d : String(d));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
 
 // ── Trade-link mirror (localStorage) ──────────────────────────────────────────
 // The DB column `trades.position_id` is the canonical store, but if the schema migration hasn't
@@ -3185,7 +3201,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (group.length < 2) return;
     add("critical", "duplicates", "The same trade appears twice",
       `This exact trade is saved ${group.length} times — same ticker, dates, shares, and profit/loss. Counting it more than once makes your win rate and totals wrong.`,
-      group.map(t => `${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)} · source: ${t.source || "manual"}`),
+      group.map(t => `${t.ticker} · ${fmtNice(t.entry)} → ${fmtNice(t.exit)} · ${t.shares} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)} · source: ${t.source || "manual"}`),
       "Open your Trade Journal, find the identical rows, and delete all but one — keep the copy that has your notes."
     );
   });
@@ -3196,7 +3212,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (t.ibExecId && deletedSet.has(t.ibExecId)) {
       add("critical", "duplicates", "A deleted IBKR trade came back",
         `A ${t.ticker} trade you deleted before has shown up again in your journal. Left as-is, it throws off your numbers.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} · ${t.shares} sh · source: ${t.source || "manual"}`],
+        [`${t.ticker} · ${fmtNice(t.entry)} · ${t.shares} sh · source: ${t.source || "manual"}`],
         "Open your Trade Journal, find this trade, and delete it again."
       );
     }
@@ -3209,7 +3225,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (group.length < 2) return;
     add("critical", "duplicates", "Same IBKR position listed twice",
       `Two open positions point to the same IBKR holding, so your exposure is being counted twice.`,
-      group.map(p => `${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source: ${p.source || "manual"}`),
+      group.map(p => `${p.sym} · entry ${fmtNice(p.entry)} · ${p.shares} sh · source: ${p.source || "manual"}`),
       "On the Dashboard, in Open Positions, delete the duplicate row — keep the one with your notes."
     );
   });
@@ -3234,8 +3250,8 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     picked.forEach(i => claimedIds.add(elig[i].id));
     add("warn", "duplicates", "One manual trade matches several IBKR fills",
       `A ${manual.ticker} trade you typed in by hand (${manualShares} sh) matches ${picked.length} IBKR fill${picked.length === 1 ? "" : "s"} for the same ticker. The trade is being counted twice.`,
-      [`Manual: ${manual.ticker} · ${tradeDateISO(manual.entry)} → ${tradeDateISO(manual.exit)} · ${manualShares} sh · ${(Number(manual.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(manual.plDollar) || 0).toFixed(2)}${manual.rMult != null ? ` · ${Number(manual.rMult).toFixed(2)}R` : ""}`,
-       ...picked.map(i => { const t = elig[i]; return `IBKR: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
+      [`Manual: ${manual.ticker} · ${fmtNice(manual.entry)} → ${fmtNice(manual.exit)} · ${manualShares} sh · ${(Number(manual.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(manual.plDollar) || 0).toFixed(2)}${manual.rMult != null ? ` · ${Number(manual.rMult).toFixed(2)}R` : ""}`,
+       ...picked.map(i => { const t = elig[i]; return `IBKR: ${t.ticker} · ${fmtNice(t.entry)} → ${fmtNice(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
       "In your Trade Journal, delete either the hand-typed trade or the IBKR copies — keep whichever has your notes."
     );
   });
@@ -3256,8 +3272,8 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     picked.forEach(i => claimedIds.add(elig[i].id));
     add("warn", "duplicates", "One IBKR trade matches several manual trims",
       `One IBKR trade on ${ibkr.ticker} (${ibkrShares} sh) is the same as ${picked.length} smaller trades you typed in by hand. The trade is being counted twice.`,
-      [`IBKR: ${ibkr.ticker} · ${tradeDateISO(ibkr.entry)} → ${tradeDateISO(ibkr.exit)} · ${ibkrShares} sh · ${(Number(ibkr.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(ibkr.plDollar) || 0).toFixed(2)}`,
-       ...picked.map(i => { const t = elig[i]; return `Manual: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
+      [`IBKR: ${ibkr.ticker} · ${fmtNice(ibkr.entry)} → ${fmtNice(ibkr.exit)} · ${ibkrShares} sh · ${(Number(ibkr.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(ibkr.plDollar) || 0).toFixed(2)}`,
+       ...picked.map(i => { const t = elig[i]; return `Manual: ${t.ticker} · ${fmtNice(t.entry)} → ${fmtNice(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
       "In your Trade Journal, delete whichever set is missing your notes — keep the other."
     );
   });
@@ -3273,7 +3289,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (!Number.isFinite(ep) || ep <= 0) missing.push(`entry price (${p.ep == null ? "null" : p.ep})`);
     if (missing.length) add("critical", "orphans", "This open position is missing key info",
       `An open position is missing its ${missing.join(", ")}. Without these, your position size, exposure, and risk numbers can't be worked out.`,
-      [`${p.sym || "(no ticker)"} · entry ${tradeDateISO(p.entry) || "?"} · source: ${p.source || "manual"}`],
+      [`${p.sym || "(no ticker)"} · entry ${p.entry ? fmtNice(p.entry) : "?"} · source: ${p.source || "manual"}`],
       "On the Dashboard, open this position and fill in the missing details — or delete the row if it isn't a real trade."
     );
   });
@@ -3286,7 +3302,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (d && pct && Math.sign(d) !== Math.sign(pct)) {
       add("warn", "formulas", "Your dollar and percent P/L disagree",
         `Your ${t.ticker} trade shows a ${d >= 0 ? "profit" : "loss"} in dollars but a ${pct >= 0 ? "profit" : "loss"} in percent — usually a typo in one of them.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · $${d.toFixed(2)} · ${pct.toFixed(2)}%`],
+        [`${t.ticker} · ${fmtNice(t.entry)} → ${fmtNice(t.exit)} · $${d.toFixed(2)} · ${pct.toFixed(2)}%`],
         "Open the trade in your Trade Journal, fix the wrong number, and Save."
       );
     }
@@ -3307,7 +3323,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (t.rMult != null && Number(t.rMult) !== 0 && (!t.stop || Number(t.stop) <= 0)) {
       add("info", "formulas", "This trade has an R-multiple but no stop loss",
         `Your ${t.ticker} trade shows ${Number(t.rMult).toFixed(2)}R but no stop, so the R can't be checked. Usually old data.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} · ${Number(t.rMult).toFixed(2)}R · stop: ${t.stop || "not set"}`],
+        [`${t.ticker} · ${fmtNice(t.entry)} · ${Number(t.rMult).toFixed(2)}R · stop: ${t.stop || "not set"}`],
         "Open the trade and either add the stop you used, or clear the R — then Save."
       );
     }
@@ -3325,7 +3341,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (original > 0 && trimmed > original * 1.001) {
       add("critical", "formulas", "You sold more shares than you owned",
         `Your partial sells on ${p.sym} add up to ${trimmed} shares, but you only have ${remaining} left — usually one sell got logged twice.`,
-        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${matches.length} matching trim${matches.length === 1 ? "" : "s"} · sold ${trimmed} sh · remaining ${remaining} sh`],
+        [`${p.sym} · entry ${fmtNice(p.entry)} · ${matches.length} matching trim${matches.length === 1 ? "" : "s"} · sold ${trimmed} sh · remaining ${remaining} sh`],
         "In your Trade Journal, find the repeated partial sell and delete it."
       );
     }
@@ -3337,7 +3353,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if ((t.source === "ibkr" || t.source === "reconciled") && !t.ibExecId) {
       add("critical", "ibkr", "IBKR trade is missing its fill ID",
         `This ${t.ticker} trade is marked as from IBKR but has no IBKR ID, so a future sync could add it again as a duplicate.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · source: ${t.source}`],
+        [`${t.ticker} · ${fmtNice(t.entry)} → ${fmtNice(t.exit)} · ${t.shares} sh · source: ${t.source}`],
         "Open the trade and change its source to Manual — keeps the trade, stops the duplicate."
       );
     }
@@ -3348,7 +3364,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if ((p.source === "ibkr" || p.source === "reconciled") && !p.ibConid) {
       add("critical", "ibkr", "IBKR position is missing its position ID",
         `This ${p.sym} position is marked as from IBKR but has no IBKR ID, so a sync could add a second copy.`,
-        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source: ${p.source}`],
+        [`${p.sym} · entry ${fmtNice(p.entry)} · ${p.shares} sh · source: ${p.source}`],
         "On the Dashboard, open the position and change its source to Manual."
       );
     }
@@ -3387,8 +3403,8 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (matchingClosed) {
       add("warn", "orphans", `Your ${p.sym} position may already be closed`,
         `${p.sym} is still open on your Dashboard, but your journal shows a finished ${p.sym} trade from the same day — it may already be closed.`,
-        [`Open on Dashboard: ${p.sym} · entry ${posEntryDay} · ${p.shares} sh${p.notes ? ` · has notes` : ""}`,
-         `Closed in Journal: ${matchingClosed.ticker} · ${tradeDateISO(matchingClosed.entry)} → ${tradeDateISO(matchingClosed.exit)} · ${matchingClosed.shares} sh · ${(Number(matchingClosed.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(matchingClosed.plDollar) || 0).toFixed(2)}`],
+        [`Open on Dashboard: ${p.sym} · entry ${fmtNice(posEntryDay)} · ${p.shares} sh${p.notes ? ` · has notes` : ""}`,
+         `Closed in Journal: ${matchingClosed.ticker} · ${fmtNice(matchingClosed.entry)} → ${fmtNice(matchingClosed.exit)} · ${matchingClosed.shares} sh · ${(Number(matchingClosed.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(matchingClosed.plDollar) || 0).toFixed(2)}`],
         "If it's really closed, remove the open row on the Dashboard — your journal already has the finished trade. (If you only sold part of it, leave it.)"
       );
     }
@@ -3722,7 +3738,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                         <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 500, fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "center", fontWeight: 500, fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>Status</th><th style={{ padding: "8px 8px", textAlign: "right", fontWeight: 500, fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>Action</th></tr></thead>
                         <tbody>{sec.rows.map((r, i) => (
                           <tr key={i} style={{ borderBottom: `1px solid var(--w04)`, opacity: (choices[sec.kind][i] === "skip") ? 0.45 : 1 }}>
-                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (col === "entry" || col === "exit") ? (tradeDateISO(r[col]) || r[col] || "—") : (r[col] ?? "—")}</td>)}
+                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (col === "entry" || col === "exit") ? (r[col] ? fmtNice(r[col]) : "—") : (r[col] ?? "—")}</td>)}
                             <td style={{ padding: "7px 8px", textAlign: "center" }}>
                               <div style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
                                 {chip(r.action)}
@@ -3790,14 +3806,14 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                           <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-manual" ? "rgba(255,80,0,0.10)" : "var(--w03)", border: `1px solid ${ch === "delete-manual" ? "rgba(255,80,0,0.30)" : C.border}`, opacity: ch === "delete-manual" ? 0.7 : 1 }}>
                             <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>Your manual {ch === "delete-manual" && "· will be deleted"}</div>
                             <div style={{ color: C.text, lineHeight: 1.5 }}>
-                              {tradeDateISO(g.manualEntry) || g.manualEntry} → {tradeDateISO(g.manualExit) || g.manualExit} · {Number(g.manualShares).toLocaleString()} sh · <strong style={{ color: g.manualPL >= 0 ? C.green : C.red }}>{g.manualPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.manualPL), 2)}</strong>{g.manualRMult != null && <> · {Number(g.manualRMult).toFixed(2)}R</>}
+                              {g.manualEntry ? fmtNice(g.manualEntry) : "—"} → {g.manualExit ? fmtNice(g.manualExit) : "—"} · {Number(g.manualShares).toLocaleString()} sh · <strong style={{ color: g.manualPL >= 0 ? C.green : C.red }}>{g.manualPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.manualPL), 2)}</strong>{g.manualRMult != null && <> · {Number(g.manualRMult).toFixed(2)}R</>}
                             </div>
                           </div>
                           <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-ibkr" ? "rgba(255,80,0,0.10)" : "var(--w03)", border: `1px solid ${ch === "delete-ibkr" ? "rgba(255,80,0,0.30)" : C.border}`, opacity: ch === "delete-ibkr" ? 0.7 : 1 }}>
                             <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>IBKR rows ({g.ibkrRows.length}) {ch === "delete-ibkr" && "· will be deleted"}</div>
                             {g.ibkrRows.map(r => (
                               <div key={r.id} style={{ color: C.text, lineHeight: 1.5 }}>
-                                {tradeDateISO(r.entry) || r.entry} → {tradeDateISO(r.exit) || r.exit} · {Number(r.shares).toLocaleString()} sh · <strong style={{ color: r.plDollar >= 0 ? C.green : C.red }}>{r.plDollar >= 0 ? "+" : ""}{fmt$(Math.abs(r.plDollar), 2)}</strong>
+                                {r.entry ? fmtNice(r.entry) : "—"} → {r.exit ? fmtNice(r.exit) : "—"} · {Number(r.shares).toLocaleString()} sh · <strong style={{ color: r.plDollar >= 0 ? C.green : C.red }}>{r.plDollar >= 0 ? "+" : ""}{fmt$(Math.abs(r.plDollar), 2)}</strong>
                               </div>
                             ))}
                             <div style={{ marginTop: 4, paddingTop: 4, borderTop: `1px dashed ${C.border}`, color: C.muted, fontSize: "0.6875rem" }}>Total: {Number(g.ibkrTotalShares).toLocaleString()} sh · {g.ibkrTotalPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.ibkrTotalPL), 2)}</div>
@@ -6596,7 +6612,7 @@ function FillBreakdown({ fills, privacyMode, ibkrLocked, onEdit }) {
     String(tradeDateISO(a.exit) || "").localeCompare(String(tradeDateISO(b.exit) || "")) || ((a.id || 0) - (b.id || 0)));
   const n2 = (v) => Number(v) || 0;
   const money = (v) => privacyMode ? "••••" : (v < 0 ? "−" : "+") + "$" + Math.abs(n2(v)).toFixed(2);
-  const dt = (d, tm) => (tradeDateISO(d) || d || "—") + (tm ? ` · ${tm}` : "");
+  const dt = (d, tm) => (d ? fmtNice(d) : "—") + (tm ? ` · ${tm}` : "");
   const total = rows.reduce((s, f) => s + n2(f.plDollar), 0);
   const totalSh = rows.reduce((s, f) => s + n2(f.shares), 0);
   const totalFee = rows.reduce((s, f) => s + n2(f.commission), 0);
@@ -8244,9 +8260,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 4px", borderTop: i ? "1px solid var(--w04)" : "none", fontSize: "0.75rem", cursor: "pointer", flexWrap: "wrap" }}>
                       <b style={{ minWidth: 52, color: "var(--white)" }}>{t.ticker}</b>
                       <span style={{ minWidth: 120, color: "var(--white)", fontWeight: 600 }}>{th || "— no sector"}</span>
-                      <span style={{ minWidth: 78, color: "var(--muted)" }}>{tradeDateISO(t.entry) || "—"}</span>
+                      <span style={{ minWidth: 78, color: "var(--muted)" }}>{t.entry ? fmtNice(t.entry) : "—"}</span>
                       {isTheme && (rk
-                        ? <span style={{ color: "var(--muted)", fontSize: "0.75rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>
+                        ? <span style={{ color: "var(--muted)", fontSize: "0.75rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date ? fmtNice(rk.date) : "—"}</span></span>
                         : <span style={{ color: "var(--muted)", fontSize: "0.75rem", fontStyle: "italic" }}>{!th ? "sector unknown" : !tradeDateISO(t.entry) ? "no entry date — not judged" : "before theme coverage"}</span>)}
                       <span style={{ minWidth: 62, fontWeight: 700, color: (Number(t.plPct) || 0) > 0 ? "var(--green)" : "var(--red)" }}>{sgnPct(Number(t.plPct))}</span>
                       <span style={{ color: "var(--muted)" }}>{t.rMult != null ? sgnR(Number(t.rMult)) : "—"}</span>
@@ -8661,7 +8677,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       <div key={t.id ?? k} onClick={() => openReview(t)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 7, cursor: "pointer", fontSize: "0.6875rem", borderBottom: k < rows.length - 1 ? "1px solid var(--w06)" : "none" }}
                         onMouseEnter={e => e.currentTarget.style.background = "var(--w04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <span style={{ fontWeight: 800, minWidth: 52 }}>{t.ticker}</span>
-                        <span style={{ color: "var(--muted)", minWidth: 78 }}>{tradeDateISO(t.exit) || "—"}</span>
+                        <span style={{ color: "var(--muted)", minWidth: 78 }}>{t.exit ? fmtNice(t.exit) : "—"}</span>
                         <span style={{ color: (Number(t.plPct) || 0) >= 0 ? "var(--green)" : "var(--red)", minWidth: 62, fontVariantNumeric: "tabular-nums" }}>{sgnPct(Number(t.plPct) || 0)}</span>
                         <span style={{ color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>{sgnMoney(Number(t.plDollar) || 0)}</span>
                         <span style={{ marginLeft: "auto", color: "var(--muted)" }}>View ›</span>
@@ -8764,8 +8780,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
-                      <td data-l="Entry date">{tradeDateISO(t.entry) || t.entry || "—"}</td>
-                      <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
+                      <td data-l="Entry date">{t.entry ? fmtNice(t.entry) : "—"}</td>
+                      <td data-l="Exit date">{t.exit ? fmtNice(t.exit) : "—"}</td>
                       {false && <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>}
                       <td className="pro-only" data-l="Theme">{(() => {
                         const th = sectorFor(t.ticker);
@@ -8896,7 +8912,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
                   <button className="tp-x" aria-label="Close" onClick={() => setPreviewTrade(null)}>&times;</button>
                 </div>
-                <div className="tp-sub">Opened {tradeDateISO(t.entry) || t.entry || "—"} · Closed {tradeDateISO(t.exit) || t.exit || "—"} · Held {holdLabel(t)}</div>
+                <div className="tp-sub">Opened {t.entry ? fmtNice(t.entry) : "—"} · Closed {t.exit ? fmtNice(t.exit) : "—"} · Held {holdLabel(t)}</div>
                 <div className={"tp-pnl " + (up ? "up" : "dn")}>
                   <div className="tp-pnl-lbl">Net P/L</div>
                   <div className="tp-pnl-v">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</div>
@@ -9050,8 +9066,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                           )}
                           <Rw k="Average Entry" v={"$" + entryP.toFixed(2)} />
                           <Rw k="Average Exit" v={"$" + exitP.toFixed(2)} />
-                          <Rw k="Entry Time" v={(tradeDateISO(t.entry) || "—") + (t.entryTime ? " · " + t.entryTime + " ET" : "")} />
-                          <Rw k="Exit Time" v={(tradeDateISO(t.exit) || "—") + (t.exitTime ? " · " + t.exitTime + " ET" : "")} />
+                          <Rw k="Entry Time" v={(t.entry ? fmtNice(t.entry) : "—") + (t.entryTime ? " · " + t.entryTime + " ET" : "")} />
+                          <Rw k="Exit Time" v={(t.exit ? fmtNice(t.exit) : "—") + (t.exitTime ? " · " + t.exitTime + " ET" : "")} />
                           <Rw k="Best Exit Price" v={ex && ex.mfe != null ? "$" + Number(ex.mfe).toFixed(2) : "--"} c="var(--green)" tip="The MFE price — the best the market offered while you were in" />
                           <Rw k="Best Exit Time" v={ex && ex.bestT != null ? excTime(ex.bestT, ex.res) : "--"} />
                           <Rw k="Hold Time" v={holdLabel(t)} />
@@ -9210,14 +9226,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       return (
                         <tr key={t.id}>
                           <td><b>{t.ticker}</b></td>
-                          <td>{tradeDateISO(t.entry) || "—"}</td>
-                          <td>{tradeDateISO(t.exit) || "—"}</td>
+                          <td>{t.entry ? fmtNice(t.entry) : "—"}</td>
+                          <td>{t.exit ? fmtNice(t.exit) : "—"}</td>
                           <td>{(Number(t.shares) || 0).toLocaleString()}</td>
                           <td><span className={up ? "pl up" : "pl dn"}>{sgnPct(Number(t.plPct))}</span></td>
                           <td><span className={"lk " + lkClass}>{lkLabel}</span></td>
                           <td>
                             <select className="linksel" value={choice} onChange={e => setLinkChoices(prev => ({ ...prev, [t.id]: e.target.value === "past" || e.target.value === "skip" ? e.target.value : (Number(e.target.value) || e.target.value) }))} disabled={linkStatus === "applying"}>
-                              {lots.map(p => <option key={p.id} value={p.id}>→ {p.sym} (open · {tradeDateISO(p.entry) || "?"})</option>)}
+                              {lots.map(p => <option key={p.id} value={p.id}>→ {p.sym} (open · {p.entry ? fmtNice(p.entry) : "?"})</option>)}
                               <option value="past">Past cycle / unlinked</option>
                               <option value="skip">Skip (no change)</option>
                             </select>
@@ -9564,7 +9580,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid var(--w06)" : "none", fontSize: "0.75rem", cursor: "pointer" }}>
                     <input type="checkbox" checked={fxSel.has(t.id)} onChange={() => setFxSel(prev => { const n = new Set(prev); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })} />
                     <b style={{ minWidth: 76 }}>{t.ticker}</b>
-                    <span style={{ color: "var(--muted)", minWidth: 130 }}>{tradeDateISO(t.entry) || t.entry} → {tradeDateISO(t.exit) || t.exit}</span>
+                    <span style={{ color: "var(--muted)", minWidth: 130 }}>{fmtNice(t.entry)} → {fmtNice(t.exit)}</span>
                     <span style={{ minWidth: 130 }}>${Number(t.entryP || 0).toLocaleString()} → ${Number(t.exitP || 0).toLocaleString()}</span>
                     <span style={{ fontWeight: 700, color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{(Number(t.plDollar) || 0) >= 0 ? "+" : "−"}${Math.abs(Number(t.plDollar) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                   </label>
@@ -10003,7 +10019,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid var(--w06)" : "none", fontSize: "0.75rem", cursor: "pointer" }}>
                   <input type="checkbox" checked={fxSel.has(t.id)} onChange={() => setFxSel(prev => { const n = new Set(prev); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })} />
                   <b style={{ minWidth: 76 }}>{t.ticker}</b>
-                  <span style={{ color: "var(--muted)", minWidth: 130 }}>{tradeDateISO(t.entry) || t.entry} → {tradeDateISO(t.exit) || t.exit}</span>
+                  <span style={{ color: "var(--muted)", minWidth: 130 }}>{fmtNice(t.entry)} → {fmtNice(t.exit)}</span>
                   <span style={{ minWidth: 130 }}>${Number(t.entryP || 0).toLocaleString()} → ${Number(t.exitP || 0).toLocaleString()}</span>
                   <span style={{ fontWeight: 700, color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{(Number(t.plDollar) || 0) >= 0 ? "+" : "−"}${Math.abs(Number(t.plDollar) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 </label>
@@ -11253,9 +11269,9 @@ function WatchlistCard({ C, font, session }) {
         <span style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "-0.01em", color: "var(--text)" }}>The Hunt List</span>
         <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: C.text, background: "var(--w06)", borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length}</span>
         <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={stampStyle}>list {WATCHLIST?.asof || "—"} {wlWkd(WATCHLIST?.asof)}</span>
-          <span style={stampStyle}>groups {GROUP_RS?.asof || "—"} {wlWkd(GROUP_RS?.asof)}</span>
-          {showStockStamp && <span style={stampStyle}>stocks {stockAsof} {wlWkd(stockAsof)}</span>}
+          <span style={stampStyle}>list {WATCHLIST?.asof ? fmtNice(WATCHLIST.asof) : "—"} {wlWkd(WATCHLIST?.asof)}</span>
+          <span style={stampStyle}>groups {GROUP_RS?.asof ? fmtNice(GROUP_RS.asof) : "—"} {wlWkd(GROUP_RS?.asof)}</span>
+          {showStockStamp && <span style={stampStyle}>stocks {fmtNice(stockAsof)} {wlWkd(stockAsof)}</span>}
         </span>
       </div>
 
@@ -11918,11 +11934,20 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
         const tExitISO = tradeDateISO(t.exit);
         if (!tExitISO) return false;
         if (tExitISO < posEntryISO) return false;
-        // Same-day re-entry guard (DELL 2026-08-07): a stop-out of the PREVIOUS cycle can land on
-        // the very day the new lot opens, so the exit-date rule alone cannot separate cycles.
-        // The trade's own ENTRY date can: a past cycle opened before this position did — exclude
-        // it. Trims of the current campaign carry the campaign's entry date (base+add stays
-        // blended to one date), so genuine partials keep matching.
+        // ── The cycle invariant (DELL 2026-08-07 — closes the dead-campaign bleed for good) ──
+        // A trade is a partial of THIS lot only if it EXITED AFTER the lot opened. You are flat
+        // before a re-entry, so every previous cycle's exit precedes the current lot's open —
+        // at any granularity. Two layers, degrading gracefully with data quality:
+        //   1. Same-day boundary: when both sides carry a clock time, require exit time > the
+        //      position's open time (separates an intraday round-trip from a same-day re-entry).
+        //   2. Entry-date screen: a trade OPENED before this position opened belongs to a past
+        //      cycle — exclude. Campaign trims carry the campaign's entry date (base+add stays
+        //      blended to one date), so genuine partials keep matching.
+        if (tExitISO === posEntryISO) {
+          const toMin = (s) => { const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+          const pe = toMin(p.entryTime), tx = toMin(t.exitTime);
+          if (pe != null && tx != null && tx <= pe) return false;
+        }
         const tEntryISO = tradeDateISO(t.entry);
         if (tEntryISO && tEntryISO < posEntryISO) return false;
         return true;
@@ -12080,7 +12105,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
     const realizedShares = rb.shares || 0;
     // Original total shares = currently-held + already-sold (for "% trimmed" display)
     const origShares = sharesN + realizedShares;
-    const trimPct = origShares > 0 ? (realizedShares / origShares) * 100 : 0;
+    const trimPct = origShares > 0 ? Math.min(100, (realizedShares / origShares) * 100) : 0;
     // Cost financed = realized profits >= initial risk (playing with house money)
     const costFinanced = realizedPL > 0 && initRiskD > 0 && realizedPL >= initRiskD;
     // ─── Intraday projected fields ─── pure read of the intraday_log on this position. Adds projected
@@ -13075,7 +13100,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                   <span style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--white)" }}>Daily Market Plan</span>
                   <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
                     <span title={ps.detail} style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums", cursor: "help" }}>
-                      {ps.updated ? `updated ${ps.updated} (${ps.day})` : ""}
+                      {ps.updated ? `updated ${fmtNice(ps.updated)} (${ps.day})` : ""}
                     </span>
                     <span data-html2canvas-ignore="true" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", opacity: 0.85 }}>Copy the whole plan</span>
@@ -14751,7 +14776,7 @@ function LiveTradesFab({ C, font, isMobile }) {
             <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;of account</span>
           </span>
         ))}
-        {chipRow("Date of entry", <span style={val}>{o.entryDate ? wlFmtDay(o.entryDate) + ", " + String(o.entryDate).slice(0, 4) : "—"}</span>)}
+        {chipRow("Date of entry", <span style={val}>{o.entryDate ? fmtNice(o.entryDate) : "—"}</span>)}
         {chipRow("Entry price", <span style={val}>{o.entry == null ? "—" : Number(o.entry).toFixed(2)}</span>)}
         {/* Stoploss journey (Valen 2026-08-07: "think of a better way of presenting original +
             current"). One row: original stop struck-muted → current stop bold, with the status
@@ -14872,7 +14897,7 @@ function LiveTradesFab({ C, font, isMobile }) {
               <span className="vivlt-live" style={{ width: 8, height: 8, borderRadius: 99, background: C.goldBright, display: "inline-block", flex: "0 0 auto" }} />
               <span style={{ fontFamily: "'Geist','Plus Jakarta Sans',sans-serif", fontSize: "0.875rem", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)" }}>Live Trades</span>
               {state === "ready" && <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: C.text, background: "var(--w06)", borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length} open</span>}
-              {state === "ready" && <span style={{ marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 700, color: C.muted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>as of {data.asof} {wlWkd(data.asof)}</span>}
+              {state === "ready" && <span style={{ marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 700, color: C.muted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>as of {fmtNice(data.asof)} {wlWkd(data.asof)}</span>}
               <button
                 onClick={() => setOpen(false)}
                 title="Close"
@@ -16073,12 +16098,29 @@ function AppInner() {
     };
 
     // ── TRADES ── updates first (by id), then bulk insert new
+    // Explicit campaign link at insert (2026-08-08, mirrors api/ibkr-ingest.js): one open lot of
+    // the ticker + the fill EXITED AFTER that lot opened (date, then time on the same-day
+    // boundary) → stamp position_id so Realized attribution is deterministic, not heuristic.
+    const lotByTicker = {};
+    for (const p of (positions || [])) { const s = String(p.sym || "").trim().toUpperCase(); if (s && p.id) (lotByTicker[s] = lotByTicker[s] || []).push(p); }
+    const linkLot = (r) => {
+      const lots = lotByTicker[String(r.ticker || "").trim().toUpperCase()] || [];
+      if (lots.length !== 1) return null;
+      const p = lots[0], pe = tradeDateISO(p.entry), tx = tradeDateISO(r.exit);
+      if (!pe || !tx || tx < pe) return null;
+      if (tx === pe) {
+        const toMin = (s) => { const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+        const a = toMin(p.entryTime), b = toMin(r.exitTime);
+        if (a == null || b == null || b <= a) return null;
+      }
+      return p.id;
+    };
     const tradeInserts = [];
     for (const r of tradeRows) {
       if (r.action === "synced" && r.execId) journaledExecIds.add(r.execId); // already journaled by a prior sync
       if (r.choice === "skip") continue;
       if (r.choice === "new") {
-        tradeInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso, is_deleted: false });
+        tradeInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso, is_deleted: false, position_id: linkLot(r) });
       } else if ((r.choice === "reconcile" || r.choice === "update") && r.matchId) {
         let rMult; // undefined = leave the column as-is
         if (r.choice === "reconcile" && r.matchStop > 0) {

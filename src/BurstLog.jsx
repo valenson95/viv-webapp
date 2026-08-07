@@ -18,6 +18,25 @@ const gaugeLabel = (n) =>
 const CAP_ORDER = ["<$500M", "$500M–2B", "$2–10B", ">$10B", "unknown"];
 const fmtCap = (b) => b == null ? "—" : b >= 1 ? "$" + b.toFixed(1) + "B" : "$" + Math.round(b * 1000) + "M";
 
+// Display-only date format: "2026-07-24" → "Jul 24th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+// Same, but for a "YYYY-MM-DD HH:MM TZ" timestamp — formats the date, keeps the time/zone suffix.
+function fmtNiceTs(s) {
+  if (!s) return "—";
+  const str = String(s);
+  const sp = str.indexOf(" ");
+  if (sp < 0) return fmtNice(str);
+  return fmtNice(str.slice(0, sp)) + str.slice(sp);
+}
+
 function Chip({ children, color, C }) {
   return <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.02em", background: "var(--w06)", border: `1px solid ${C.border}`, color: color || "var(--muted)" }}>{children}</span>;
 }
@@ -54,7 +73,7 @@ export default function BurstLog({ C, font }) {
         <span style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--text)" }}>🔥 Burst Log</span>
         <span style={small}>daily 20%-in-5-days (and 50%-in-40-days) movers — size · sector · theme fit</span>
         <span style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>
-          as of {D.asof} close · refreshed {D.updated}
+          as of {fmtNice(D.asof)} close · refreshed {fmtNiceTs(D.updated)}
         </span>
       </div>
       <div style={{ ...small, lineHeight: 1.55, maxWidth: 820, marginBottom: 14 }}>
@@ -129,7 +148,7 @@ export default function BurstLog({ C, font }) {
                 return (
                   <React.Fragment key={s.date}>
                     <tr onClick={() => setOpen(isOpen ? null : s.date)} style={{ cursor: "pointer", borderTop: "1px solid var(--w04)", background: isOpen ? "var(--w06)" : "transparent" }}>
-                      <td style={{ ...td, textAlign: "left", fontWeight: 600, color: "var(--text)" }}>{s.date} <span style={{ color: C.muted, fontSize: "0.6875rem" }}>{isOpen ? "▴" : "▾"}</span></td>
+                      <td style={{ ...td, textAlign: "left", fontWeight: 600, color: "var(--text)" }}>{fmtNice(s.date)} <span style={{ color: C.muted, fontSize: "0.6875rem" }}>{isOpen ? "▴" : "▾"}</span></td>
                       <td style={{ ...tdn, color: gaugeColor(s.gauge.up20, C) }}>{s.gauge.up20}</td>
                       <td style={{ ...tdn, color: s.gauge.down20 > s.gauge.up20 ? C.red : C.muted }}>{s.gauge.down20}</td>
                       <td style={{ ...tdn, color: C.white }}>{s.rows.length}</td>

@@ -23,6 +23,17 @@ const sgn = (v, d = 1) => v == null || !isFinite(v) ? "—" : (v > 0 ? "+" : "")
 const SUP = ["¹", "²", "³"];
 const MONO = "'Geist Mono', ui-monospace, monospace";
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+
 // PRIMARY-state chip metadata — NEUTRAL, no trade-advice wording. `label` = full
 // (how-to / filters), `short` = compact table chip.
 const STATE = {
@@ -243,7 +254,7 @@ function HoldingsPopup({ target, onClose, C, font }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
             <span style={label}>{holdings ? `Top ${holdings.length} holdings · weighted` : "Holdings"}</span>
-            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>as of {fmtNice(asof)}</span>
           </div>
           <div style={{ marginTop: 5, fontSize: "0.75rem", color: "var(--faint)", lineHeight: 1.5 }}>
             Holdings change slowly — refreshed periodically.
@@ -333,7 +344,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
 
   const asof = GROUP_RS?.asof || "—";
   const refreshed = GROUP_RS?.refreshed;
-  const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof} close`;
+  const stamp = refreshed && refreshed !== asof ? `as of ${fmtNice(asof)} · updated ${fmtNice(refreshed)}` : `as of ${fmtNice(asof)} close`;
   const allRows = GROUP_RS?.rows || [];
   const pf = GROUP_RS?.pf; // Plan & Focus rows — may be undefined while regenerating
   const ll = GROUP_RS?.ll; // Liquid Leaders per-stock rows — may be undefined while regenerating
@@ -924,7 +935,7 @@ export function RotationMini({ C, font, session, noStamp }) {
   const rows = GROUP_RS?.rows || [];
   const asof = GROUP_RS?.asof || "—";
   const refreshed = GROUP_RS?.refreshed;
-  const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof}`;
+  const stamp = refreshed && refreshed !== asof ? `as of ${fmtNice(asof)} · updated ${fmtNice(refreshed)}` : `as of ${fmtNice(asof)}`;
   const top = [...rows]
     .sort((a, b) => (b.rs1m ?? -1) - (a.rs1m ?? -1) || (b.thrust ?? -1) - (a.thrust ?? -1) || (b.off52 ?? -999) - (a.off52 ?? -999))
     .slice(0, 10);

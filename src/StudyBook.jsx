@@ -18,6 +18,17 @@ import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectioni
 
 export const isStudyRow = (r) => !!(r && r.metrics && r.metrics.study);
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const SB_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const sbFmtNice = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  if (isNaN(d)) return "—";
+  const day = d.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${SB_MONTHS[d.getMonth()]} ${day}${suffix}, ${d.getFullYear()}`;
+};
+
 // ── Campaigns (Valen 2026-07-24): a trending name prints multiple setups across its legs. Legs of one
 // trend share a `campaign_id` (root = `<TICKER>-<root trigger date>`, children copy it). `leg_index` is
 // STRUCTURAL — recomputed here from the trigger-date sort, never hard-stored. A study with NO campaign_id
@@ -1972,7 +1983,7 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
               <div style={{ fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white }}>{row.ticker || "—"}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "6px 0 4px" }}>
                 <span style={{ fontSize: "0.75rem", fontWeight: 700, color: C.white }}>{s.setup}{(s.setup === "Parabolic" || s.setup === "Momentum Breakdown") && s.direction === "short" ? " · Short" : ""}</span>
-                {row.entry_date && <span style={{ fontSize: "0.6875rem", color: C.muted }}>· {row.entry_date}</span>}
+                {row.entry_date && <span style={{ fontSize: "0.6875rem", color: C.muted }}>· {sbFmtNice(row.entry_date)}</span>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 6 }}>
                 {cls && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: cls === "failure" ? "var(--redFg)" : "var(--greenFg)", border: `1px solid ${cls === "failure" ? "var(--redFg)" : "var(--greenFg)"}`, borderRadius: 99, padding: "2px 10px" }}>{cls === "failure" ? "▼ " : "▲ "}{MB_OUTCOME[cls] || cls}</span>}
@@ -2348,7 +2359,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
               {legs.map((leg, i) => { const active = leg.id === row.id;
                 return <button key={leg.id} type="button" disabled={busy} title={active ? "This leg" : "Switch to this leg (saves the current leg first)"} onClick={() => stripSwitch(leg)}
                   style={{ ...chipBase, border: `1px solid ${active ? "var(--w14)" : C.border}`, color: active ? "var(--white)" : C.muted, background: active ? "var(--w10)" : "var(--w03)", cursor: busy ? "default" : "pointer" }}>
-                  Leg {i + 1}{leg.entry_date ? ` · ${leg.entry_date}` : ""}</button>; })}
+                  Leg {i + 1}{leg.entry_date ? ` · ${sbFmtNice(leg.entry_date)}` : ""}</button>; })}
               {addingLeg ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <input type="date" autoFocus value={newLegDate} onChange={e => setNewLegDate(e.target.value)} style={{ ...inputS, width: 150, padding: "4px 8px" }} />
@@ -2448,7 +2459,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           read-only with an "edit on leg 1" hint. Solo studies (no campaign_id) = root ⇒ editable inline
           as before. legs_ma10/20 live in checks but are NOT setup ticks — they never grade. */}
       <div style={sect}>{cid ? `Campaign — whole trend · leg ${legIdx} of ${sibs.length || 1}` : "Whole-trend outcome & lifespan"}</div>
-      {cid && <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 8 }}>Campaign <b style={{ color: C.white }}>{cid}</b>{multiLeg ? ` · ${sibs[0]?.entry_date || "?"} → ${sibs[sibs.length - 1]?.entry_date || "?"}` : ""}{!isRoot ? " · shared fields edit on leg 1" : ""}</div>}
+      {cid && <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 8 }}>Campaign <b style={{ color: C.white }}>{cid}</b>{multiLeg ? ` · ${sibs[0]?.entry_date ? sbFmtNice(sibs[0].entry_date) : "?"} → ${sibs[sibs.length - 1]?.entry_date ? sbFmtNice(sibs[sibs.length - 1].entry_date) : "?"}` : ""}{!isRoot ? " · shared fields edit on leg 1" : ""}</div>}
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ minWidth: 230 }}>
           <label style={lbl}>Legs before first close below the MA (whole trend, off the AFTER chart)</label>

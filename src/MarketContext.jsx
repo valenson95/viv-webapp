@@ -16,6 +16,17 @@ const BANDS = [
 ];
 const bandFor = (ext) => BANDS.find(b => ext >= b.min) || BANDS[BANDS.length - 1];
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+
 function computeCtx(sym, candles) {
   const c = candles.map(b => b.close), h = candles.map(b => b.high), l = candles.map(b => b.low);
   const n = c.length;
@@ -104,7 +115,7 @@ export default function MarketContext({ C, font, defaultExpanded = false }) {
         <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Market Context</span>
         <span className="infodot" onClick={(e) => e.stopPropagation()} data-tip="Is the market at a good buy spot, or stretched? Green chips = the index is above that moving average. The ×-multiple is how far it's run above its 50-day line — under 2× there's room, 4×+ is stretched, go easy on new buys. SPY is the broad market; QQQ is the growth tape where breakouts live — trade smaller when it's below its short-term MAs.">i</span>
         <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: C.faint || C.muted }}>
-          {rows ? (err === "sample" ? "sample data (dev)" : `as of ${rows[0].asof} close`) : "loading…"}
+          {rows ? (err === "sample" ? "sample data (dev)" : `as of ${fmtNice(rows[0].asof)} close`) : "loading…"}
         </span>
         <span aria-hidden style={{ color: C.muted, fontSize: "1rem", lineHeight: 1, alignSelf: "center", transition: "transform .2s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
       </div>

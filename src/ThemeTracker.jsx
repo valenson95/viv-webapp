@@ -10,6 +10,17 @@ import { latestSnapshot, top5, consistentTop } from "./themes.js";
 
 const TFS = [{ k: "week", lbl: "1W" }, { k: "month", lbl: "1M" }, { k: "day", lbl: "Today" }];
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+
 export default function ThemeTracker({ C, font }) {
   const [tf, setTf] = useState("month");
   const snap = latestSnapshot();
@@ -27,7 +38,7 @@ export default function ThemeTracker({ C, font }) {
     <div style={{ fontFamily: font }}>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>DeepVue snapshot · {snap.date}</div>
+        <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>DeepVue snapshot · {fmtNice(snap.date)}</div>
         <div style={{ marginLeft: "auto", display: "flex", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 999, padding: 2 }}>{TFS.map(x => tbtn(x.k, x.lbl))}</div>
       </div>
 

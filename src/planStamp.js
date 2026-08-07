@@ -13,6 +13,17 @@ export const dayName = (iso) => {
   return isNaN(d) ? "" : DAYS[d.getUTCDay()];
 };
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtNice = (d) => {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+};
+
 export function planStamp() {
   const snap = latestSnapshot();
   const parts = {
@@ -26,10 +37,10 @@ export function planStamp() {
   const updated = updates[updates.length - 1] || null;
   const asof = asofs[asofs.length - 1] || null;
   const detail = [
-    `Breadth & trend: close ${parts.breadth.asof || "—"}, pushed ${parts.breadth.updated || "—"}`,
-    `Rotation: close ${parts.rotation.asof || "—"}, pushed ${parts.rotation.updated || "—"}`,
-    `Themes: ${parts.themes.asof || "—"}`,
-    `Earnings: covers through ${parts.earnings.asof || "—"}, pushed ${parts.earnings.updated || "—"}`,
+    `Breadth & trend: close ${fmtNice(parts.breadth.asof)}, pushed ${fmtNice(parts.breadth.updated)}`,
+    `Rotation: close ${fmtNice(parts.rotation.asof)}, pushed ${fmtNice(parts.rotation.updated)}`,
+    `Themes: ${fmtNice(parts.themes.asof)}`,
+    `Earnings: covers through ${fmtNice(parts.earnings.asof)}, pushed ${fmtNice(parts.earnings.updated)}`,
   ].join("\n");
   return { updated, asof, day: updated ? dayName(updated) : "", detail };
 }

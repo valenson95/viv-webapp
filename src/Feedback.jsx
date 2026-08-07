@@ -12,6 +12,16 @@ import { supabase } from "./supabaseClient";
 
 const CATEGORIES = ["Suggestion", "Bug", "Feature request", "Question"];
 
+// Display-only date format: Date → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+
 function timeAgo(iso) {
   if (!iso) return "";
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -19,7 +29,7 @@ function timeAgo(iso) {
   const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24); if (d < 30) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return fmtNice(new Date(iso));
 }
 const initials = (name) => (name || "M").trim().slice(0, 2).toUpperCase();
 

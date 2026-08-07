@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MARKET_MONITOR } from "./marketMonitor-data.js";
-import { InfoDot, Tip } from "./GroupRS.jsx";
+import { InfoDot, Tip, fmtNice } from "./GroupRS.jsx";
 import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 
 // ── BREADTH — market monitor ─────────────────────────────────────────────────
@@ -222,7 +222,7 @@ export default function MarketMonitor({ C, font, session }) {
 
   const asof = MARKET_MONITOR?.asof || "—";
   const refreshedFull = MARKET_MONITOR?.refreshed;
-  const asofStamp = refreshedFull && refreshedFull !== asof ? `as of ${asof} · updated ${refreshedFull}` : `as of ${asof}`;
+  const asofStamp = refreshedFull && refreshedFull !== asof ? `as of ${fmtNice(asof)} · updated ${fmtNice(refreshedFull)}` : `as of ${fmtNice(asof)}`;
   const source = MARKET_MONITOR?.source || "sheet";
   const cols = MARKET_MONITOR?.cols || [];
   const allRows = MARKET_MONITOR?.rows || [];
@@ -372,7 +372,7 @@ export default function MarketMonitor({ C, font, session }) {
       {/* 3 — TODAY TILES */}
       <section className="mm-card">
         <SectionCamera sel=".mm-card" name="breadth-today" C={C} />
-        <div style={{ ...cardLabel, marginBottom: 12 }}>Today · {asof}</div>
+        <div style={{ ...cardLabel, marginBottom: 12 }}>Today · {fmtNice(asof)}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
           {kpis.map(k => (
             <div key={k.k} style={{ background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "13px 15px" }}>
@@ -593,7 +593,7 @@ export default function MarketMonitor({ C, font, session }) {
               <pre style={{ margin: 0, padding: "14px 16px", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.75rem", lineHeight: 1.7, color: C.text, overflowX: "auto", whiteSpace: "pre", fontFamily: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" }}>{
 `DATA        the source sheet itself — live public Google Sheet CSV, which the
             user's local "Stockbee Market Monitor 2026.xlsx" mirrors.
-            source now = ${source === "sheet" ? "live sheet" : "local xlsx fallback"}   rows = ${allRows.length}   asof = ${asof}
+            source now = ${source === "sheet" ? "live sheet" : "local xlsx fallback"}   rows = ${allRows.length}   asof = ${fmtNice(asof)}
 
 FORMULAS    recomputed from the sheet's OWN formula cells (data_only=False):
               5 day ratio  (col D):  =(sum(B3:B7))/(sum(C3:C7))
@@ -630,7 +630,7 @@ export function BreadthMini({ C, font, session, noStamp }) {
   // HARD rule (Valen 2026-07-19): every data push must move the visible stamp. asof = the close
   // the numbers describe; refreshed = when the snapshot was last regenerated. Show both when they differ.
   const refreshed = MARKET_MONITOR?.refreshed;
-  const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof}`;
+  const stamp = refreshed && refreshed !== asof ? `as of ${fmtNice(asof)} · updated ${fmtNice(refreshed)}` : `as of ${fmtNice(asof)}`;
   const latest = rows[rows.length - 1] || {};
   const read = readBreadth(latest);
   return (

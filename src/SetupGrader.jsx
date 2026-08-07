@@ -7,6 +7,17 @@ import { renderShareCard, copyCard } from "./shareCard.js";
 import { sectorFor } from "./sectors.js";
 import { themeFit } from "./themes.js";
 
+// Display-only date format: today → "Aug 7th, 2026 (Fri)". keep in sync with fmtNice in App.jsx
+const SG_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SG_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function todayNice(withWeekday = false) {
+  const d = new Date();
+  const day = d.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  const base = `${SG_MONTHS[d.getMonth()]} ${day}${suffix}, ${d.getFullYear()}`;
+  return withWeekday ? `${base} (${SG_DAYS[d.getDay()]})` : base;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // SETUP GRADER — Premium Tools sub-tab. 5-star A+ breakout/continuation
 // grader. Tick what's true → per-section pass counts + an overall ★ score.
@@ -460,7 +471,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const copySummary = async () => {
     const rows = loadRowsSel();
     if (!rows.length) return;
-    const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const date = todayNice();
     const text = `VIV Screening Watchlist — ${date}\n` + rows.map(g =>
       `${(g.letter || "—").padEnd(2)} ${"★".repeat(g.stars || 0)}${"☆".repeat(5 - (g.stars || 0))}  ${g.sym}  ${Math.round((g.pct || 0) * 100)}%`).join("\n");
     try { await navigator.clipboard.writeText(text); flashMsg(`Copied ${rows.length} name${rows.length > 1 ? "s" : ""} as text 📋`); }
@@ -492,7 +503,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       const sector = post.sector || sectorFor(g.sym);
       const cv = await renderShareCard({
         ticker: g.sym, sector, themeStatus: themeFit(sector, today),
-        dateLabel: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+        dateLabel: todayNice(true),
         stars: g.stars || 0, letter: g.letter || "—", label: (GRADES[g.stars || 0] || GRADES[0])[0],
         passed: sc.passed, total: sc.total, starHit: g.starHit ?? sc.starHit, starmakers: g.starmakers ?? sc.starmakers,
         items, chartUrl: post.chart_img || null,
@@ -575,7 +586,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       const today = localISO(); // same calendar day as the printed dateLabel + the published trade_date
       const cv = await renderShareCard({
         ticker: s, sector: sectorFor(s), themeStatus: themeFit(sectorFor(s), today),
-        dateLabel: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+        dateLabel: todayNice(true),
         stars, letter, label: gLabel, passed, total: TOTAL, starHit, starmakers: STARMAKERS,
         items, chartUrl: chartImg || null,
       });

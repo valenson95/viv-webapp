@@ -4,7 +4,7 @@ import { MARKET_MONITOR } from "./marketMonitor-data.js";
 import { GROUP_RS } from "./groupRS-data.js";
 import { latestSnapshot } from "./themes.js";
 import { readBreadth } from "./MarketMonitor.jsx";
-import { InfoDot, Tip } from "./GroupRS.jsx";
+import { InfoDot, Tip, fmtNice } from "./GroupRS.jsx";
 import { LensCamera, XShare } from "./capture.jsx";
 import { supabase } from "./supabaseClient.js";
 
@@ -252,14 +252,14 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
               style={{ ...btn(false), padding: "5px 11px" }}>✎ Edit</button>
           )}
           {isOverride && read.updated && (
-            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>note · {read.updated}</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>note · {fmtNice(read.updated)}</span>
           )}
         </span>
       </div>
 
       {stale && (
         <div style={{ marginBottom: 12, fontSize: "0.75rem", lineHeight: 1.5, color: C.muted, background: "var(--w06)", border: "1px solid var(--w14)", borderRadius: 9, padding: "7px 11px" }}>
-          Written for the {read.asof} close — the tables above have since updated to {spine.dataAsof}. The chips below are current.
+          Written for the {fmtNice(read.asof)} close — the tables above have since updated to {fmtNice(spine.dataAsof)}. The chips below are current.
         </div>
       )}
 

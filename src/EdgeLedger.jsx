@@ -13,6 +13,21 @@ const G = "var(--green)", R_ = "var(--red)", MID = "var(--text)", BLUE = "var(--
 const fmt$ = (v) => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString();
 const num = (v, d = 2) => v == null ? "—" : (+v).toFixed(d);
 
+// Display-only date format for a "YYYY-MM-DD HH:MM" stamp → "Aug 7th, 2026 HH:MM". keep in sync with fmtNice in App.jsx
+const EL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNiceTs(s) {
+  if (!s) return "—";
+  const str = String(s);
+  const sp = str.indexOf(" ");
+  const datePart = sp < 0 ? str : str.slice(0, sp);
+  const rest = sp < 0 ? "" : str.slice(sp);
+  const dt = new Date(datePart + "T00:00:00");
+  if (isNaN(dt)) return str;
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${EL_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}${rest}`;
+}
+
 const STATUS = {
   "on-track":       { label: "ON TRACK",        color: G,    tip: "PF ≥ 1.3, payoff comfortably above the breakeven line for your win rate, positive expectancy, n ≥ 20." },
   "marginal":       { label: "MARGINAL",        color: MID, tip: "Realized numbers sit near the breakeven curve — alive, but the edge isn't proven yet. Runners still open aren't counted." },
@@ -139,7 +154,7 @@ export default function EdgeLedger({ C, font, session, setPage }) {
         <span title={st.tip} style={{ fontSize: "0.6875rem", fontWeight: 600, padding: "3px 10px", borderRadius: 999, color: st.color, background: `${st.color}1a`, border: `1px solid ${st.color}55`, cursor: "help" }}>{st.label}</span>
         <button onClick={() => setShowInfo(x => !x)} style={{ background: "transparent", border: "none", padding: 0, fontFamily: font, fontSize: "0.6875rem", color: C.muted, cursor: "pointer", borderBottom: "1px dotted var(--rule2)" }}>{showInfo ? "hide ✕" : "what is this?"}</button>
         {setPage && <button onClick={() => setPage("quant")} style={{ background: "rgba(201,152,42,0.1)", border: "1px solid rgba(201,152,42,0.35)", borderRadius: 999, padding: "5px 14px", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, color: C.gold, cursor: "pointer" }}>Open Quantitative Analysis →</button>}
-        <span style={{ marginLeft: "auto", fontSize: "0.6875rem", color: C.muted }}>as of {String(data.asof).slice(0, 16).replace("T", " ")} · <button onClick={() => { setOpen(x => { try { localStorage.setItem("viv-edge-open", x ? "0" : "1"); } catch {} return !x; }); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.6875rem", fontWeight: 700 }}>{open ? "collapse ▲" : "expand ▼"}</button></span>
+        <span style={{ marginLeft: "auto", fontSize: "0.6875rem", color: C.muted }}>as of {fmtNiceTs(String(data.asof).slice(0, 16).replace("T", " "))} · <button onClick={() => { setOpen(x => { try { localStorage.setItem("viv-edge-open", x ? "0" : "1"); } catch {} return !x; }); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.6875rem", fontWeight: 700 }}>{open ? "collapse ▲" : "expand ▼"}</button></span>
       </div>
 
       {showInfo && (

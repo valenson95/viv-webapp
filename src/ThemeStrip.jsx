@@ -4,6 +4,17 @@ import { latestSnapshot, consistentTop } from "./themes.js";
 import { THEME_CONSTITUENTS } from "./themeConstituents-data.js";
 import { LensCamera, XShare } from "./capture.jsx";
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const FN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${FN_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Theme Leaders — Top-5 · 1W and Top-5 · 1M as two side-by-side tables.
 // Consistent leaders (top-5 in BOTH) highlighted green. VIV glass + gold.
@@ -65,7 +76,7 @@ function ThemeConstituentsPopup({ theme, onClose, C, font }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
             <span style={label}>{countLine || "Constituents"}</span>
-            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>as of {fmtNice(asof)}</span>
           </div>
           <div style={{ marginTop: 5, fontSize: "0.75rem", color: "var(--faint)", lineHeight: 1.5 }}>
             Order = recent relative strength, strongest first.
@@ -169,7 +180,7 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
               <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Theme Leaders</span>
               <LensCamera getEl={() => cardRef.current} name="theme-leaders" C={C} style={{ marginLeft: 6 }} />
               <XShare getEl={() => cardRef.current} C={C} />
-              {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: C.muted, fontWeight: 500 }}>updated {snap.date}</span>}
+              {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: C.muted, fontWeight: 500 }}>updated {fmtNice(snap.date)}</span>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               <Col title="1 Week" rows={wkTop} />
@@ -193,7 +204,7 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, var(--w06), transparent 55%)", pointerEvents: "none" }} />
               <div style={{ position: "relative" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 13, marginBottom: 6, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--text)" }}>Theme Leaders — updated {snap.date}</span>
+                  <span style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--text)" }}>Theme Leaders — updated {fmtNice(snap.date)}</span>
                   <span onClick={e => e.stopPropagation()} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
                     <LensCamera getEl={() => popRef.current} name="theme-leaders-full" C={C} />
                     <span style={{ fontSize: "0.75rem", color: C.muted, opacity: 0.75, fontWeight: 500 }}>click anywhere to close</span>
@@ -256,7 +267,7 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Theme Leaders</span>
           <span style={{ height: 3, width: 3, borderRadius: "50%", background: C.muted, opacity: 0.5 }} />
-          <span style={{ fontSize: "0.75rem", color: C.muted, fontWeight: 500 }}>updated {snap.date}</span>
+          <span style={{ fontSize: "0.75rem", color: C.muted, fontWeight: 500 }}>updated {fmtNice(snap.date)}</span>
           <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: C.muted, display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green }} /> leads BOTH 1W &amp; 1M
           </span>

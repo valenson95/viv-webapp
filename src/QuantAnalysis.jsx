@@ -34,6 +34,25 @@ const sgnR = (v, d = 2) => v == null || !isFinite(v) ? "—" : (v >= 0 ? "+" : "
 const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
+// Display-only date format: "2026-08-07" → "Aug 7th, 2026". keep in sync with fmtNice in App.jsx
+const QA_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtNice(d) {
+  if (!d) return "—";
+  const dt = new Date(String(d) + (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? "T00:00:00" : ""));
+  if (isNaN(dt)) return "—";
+  const day = dt.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+  return `${QA_MONTHS[dt.getMonth()]} ${day}${suffix}, ${dt.getFullYear()}`;
+}
+// Same, but for a "YYYY-MM-DD HH:MM" timestamp — formats the date, keeps the time suffix.
+function fmtNiceTs(s) {
+  if (!s) return "—";
+  const str = String(s);
+  const sp = str.indexOf(" ");
+  if (sp < 0) return fmtNice(str);
+  return fmtNice(str.slice(0, sp)) + str.slice(sp);
+}
+
 /* ─── primitives (webapp visual language) ────────────────────────────────── */
 // Card micro-label — muted uppercase, the uniform section header across every card (brand chrome).
 const SecHead = ({ children }) => (
@@ -571,13 +590,13 @@ function QuantAnalysisInner({ C, font, session }) {
             <span style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 980, background: "var(--w08)", color: T.text, border: "1px solid var(--w22)" }}
               title="Admin-only research bench — never shown to members">ADMIN</span>
           </div>
-          <div style={{ fontSize: "0.75rem", color: T.muted, marginTop: 6 }}>{mode === "sys" ? `System cohort · entered ≥ ${data.systemEntry}` : `Stress-test (full) · full history since ${data.since || "2026-05-01"}, incl. recovered pre-system book`} · N={A.n} closed campaigns · the journal records your trades, this page judges the system behind them</div>
+          <div style={{ fontSize: "0.75rem", color: T.muted, marginTop: 6 }}>{mode === "sys" ? `System cohort · entered ≥ ${fmtNice(data.systemEntry)}` : `Stress-test (full) · full history since ${fmtNice(data.since || "2026-05-01")}, incl. recovered pre-system book`} · N={A.n} closed campaigns · the journal records your trades, this page judges the system behind them</div>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.08em", padding: "6px 14px", borderRadius: 980, whiteSpace: "nowrap", background: stToneDim, color: stTone, border: `1px solid ${stTone}` }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: stTone }} />{String(verdict).toUpperCase().replace(/-/g, " ")}
           </span>
-          <span style={{ fontSize: "0.6875rem", color: T.faint }}>{String(data.asof).slice(0, 16).replace("T", " ")} UTC</span>
+          <span style={{ fontSize: "0.6875rem", color: T.faint }}>{fmtNiceTs(String(data.asof).slice(0, 16).replace("T", " "))} UTC</span>
         </div>
       </div>
 

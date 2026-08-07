@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { EARNINGS } from "./earnings-data.js";
 import { GROUP_RS } from "./groupRS-data.js";
 import { MACRO_EVENTS } from "./macroCalendar-data.js";
-import { InfoDot, Tip } from "./GroupRS.jsx";
+import { InfoDot, Tip, fmtNice } from "./GroupRS.jsx";
 import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 
 // ── EARNINGS CALENDAR — V4 "est→actual lifecycle + surprise radar" ────────────
@@ -595,7 +595,7 @@ export default function EarningsCalendar({ C, font, session }) {
   const base = live || EARNINGS || {};
   const asof = base.asof || "—", refreshed = base.refreshed || "—", source = base.source || "—";
   const daysMap = base.days || {}, note = base.note || null;
-  const stamp = `updated ${refreshed} · covers through ${asof}`;
+  const stamp = `updated ${fmtNice(refreshed)} · covers through ${fmtNice(asof)}`;
 
   const today = todayISO();
   const curWeek = weekStart(today);
@@ -962,7 +962,7 @@ export function EarningsRadarMini({ C, font, session, compact, noStamp, position
   // The full popup view shows everything.
   const radar = buildRadar(daysMap, winDays).map((x) => ({ ...x, rows: x.rows.slice(0, compact ? 4 : 5) }));
   const hasAny = radar.some((x) => x.rows.length);
-  const stamp = compact ? `as of ${asof}` : `as of ${asof} · updated ${refreshed}`;
+  const stamp = compact ? `as of ${fmtNice(asof)}` : `as of ${fmtNice(asof)} · updated ${fmtNice(refreshed)}`;
   return (
     <>
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
