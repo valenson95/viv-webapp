@@ -306,6 +306,15 @@ body.theme-light .viv-glass{background:var(--sheet); border:1px solid var(--hair
      (they are conditionally rendered), so the mount animation IS the transition: no wrapper
      element, no layout risk, nothing to unwind. */
   .vd,.vj,.vp,.vs,.viv-page-fade{ animation:vivOvFade 180ms var(--ease) both; }
+  /* …but NOT the portal wrappers. Modals (edit trade, link wizard) createPortal to document.body
+     and carry .vj only to re-establish the page's scoped CSS — they are not page roots, and page
+     roots always live under #root, so a body-child selector hits exactly the wrappers. They must
+     be excluded: an opacity animation with fill-mode both keeps the element a STACKING CONTEXT
+     even after it finishes at opacity 1, which traps the modal's z-1400 inside a z-auto box. The
+     trade-details layer (.vj.td-back, z-1300, opaque) then paints over the whole modal, so
+     "Edit trade" looked dead — the modal was open underneath it. Member JH, 2026-08-06.
+     .vj.td-back / .vj.tp-back out-specify this (0,2,0 > 0,1,1) and keep their own tpFade. */
+  body > .vd,body > .vj,body > .vp,body > .vs{ animation:none; }
 }
 @keyframes vivOvFade{from{opacity:0}to{opacity:1}}
 @keyframes vivOvPop{from{opacity:0; transform:translateY(10px) scale(0.985)}to{opacity:1; transform:none}}
@@ -1485,6 +1494,14 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "Fix",
+    date: "August 7, 2026",
+    title: "Edit trade works again",
+    items: [
+      "Clicking Edit trade inside the trade review opens the editor properly again. Since yesterday's redesign it had been opening behind the page, so the button looked dead. Thanks JH for the quick report.",
+    ],
+  },
   {
     tag: "New",
     date: "August 6, 2026",
