@@ -139,6 +139,9 @@ const THEME_TOKENS = `:root{
     color-scheme:dark;
     --bg:#000000; --bg2:#0b0c0e;
     --card:#1e2124; --cardHi:#30363a; --glass:rgba(32,32,32,0.6); --sheet:#16181a;
+    /* floating chrome that sits OVER page content (corner controls, mobile bars) — theme-aware
+       so it never keeps a dark surface on the light theme */
+    --floatBg:rgba(8,8,14,0.85); --floatBgSolid:rgba(8,8,14,0.95); --floatShadow:0 6px 20px rgba(0,0,0,0.45);
     --white:#ffffff;
     --text:#ffffff;
     --muted:rgba(255,255,255,0.65);
@@ -171,6 +174,7 @@ body.theme-light{
     color-scheme:light;
     --bg:#ffffff; --bg2:#f7f8f8;
     --card:#f7f8f8; --cardHi:#eff1f1; --glass:rgba(255,255,255,0.78); --sheet:#ffffff;
+    --floatBg:rgba(255,255,255,0.92); --floatBgSolid:rgba(255,255,255,0.97); --floatShadow:0 6px 20px rgba(0,0,0,0.10);
     --white:#0b0d0e;
     --text:#0b0d0e;
     --muted:rgba(0,0,0,0.62);
@@ -2256,7 +2260,7 @@ function HeaderControls({ onLogout, inline, demoMode = false, onToggleDemo }) {
   return (
     <div style={inline
       ? { display: "flex", alignItems: "center", gap: 8, fontFamily: font }
-      : { position: "fixed", top: 20, right: 22, zIndex: 150, display: "flex", alignItems: "center", gap: 8, fontFamily: font, background: "rgba(8,8,14,0.85)", border: `1px solid ${C.border}`, borderRadius: 980, padding: "5px 7px" }}>
+      : { position: "fixed", top: 20, right: 22, zIndex: 150, display: "flex", alignItems: "center", gap: 8, fontFamily: font, background: "var(--floatBg)", border: `1px solid ${C.border}`, borderRadius: 980, padding: "5px 7px", boxShadow: "var(--floatShadow)" }}>
       {/* NO backdrop-filter here — it would become the containing block for the What's New
           modal's position:fixed overlay, pinning the popup inside this pill instead of the screen */}
       {/* keep the page navbars clear of the fixed cluster (tabs otherwise run underneath it) */}
@@ -17271,13 +17275,13 @@ function AppInner() {
     // viewport coordinates (non-standard `zoom` re-anchors fixed/sticky descendants → misplaced nav).
     return (
       <div className="mobshell" style={{ fontFamily: font, background: C.bg, WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ padding: "12px 16px", background: "var(--floatBgSolid)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
           <HeaderControls onLogout={handleLogout} inline demoMode={demoMode} onToggleDemo={toggleDemoMode} />
         </div>
         <AppBackground />
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1, zoom: appZoom }}>{pageContent}</div>
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--floatBgSolid)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
           {NAV.map(item => {
             const active = page === item.id;
             return (
